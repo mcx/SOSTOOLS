@@ -80,6 +80,8 @@ function [sos,info] = sossolve(sos,options)
 % 12/15/2022 - DJ - Remove 0x0 decision variables after psimplify.
 % 02/07/2023 - DJ - Bugfix "addextrasosvar" for matrix-valued polynomials.
 % 03/20/2023 - DJ - Add check for existence of solver on path.
+% 10/31/2024 - DJ - Bugfix for SDPT3 post-processing (smallblkdim vs
+%                                                           smblkdim)
 
 if (nargin==1)
     %Default options from old sossolve
@@ -268,7 +270,7 @@ end
 
 % AT - 9/28/2021
 if feassosp==0 || feasextrasos==0 % if the sospsimplify or addextrasosvar return infeasible solution.
-    % If the problem is clearly infeasible, sedumi can return error
+    % If the problem is clearly infeasible, sedumi can return an error.
     % Return no solution if the problem is clearly infeasible from
     % sospsimplify or addextrasosvar.
     fprintf(2,'\n Warning: Primal program infeasible, no solution produced.\n\n')
@@ -281,6 +283,21 @@ if feassosp==0 || feasextrasos==0 % if the sospsimplify or addextrasosvar return
     info.cpusec = 0; 
     sos.solinfo.info = info;
     sos.solinfo.solverOptions = options;
+
+    % % Set the solution to NaN;
+    % if isempty(sos.extravar.idx)
+    %     nx = sos.var.idx{end}-1;
+    % else
+    %     nx = sos.extravar.idx{end}-1;
+    % end
+    % ny = 0;
+    % for j=1:numel(sos.extravar.T)
+    %     ny = ny+size(sos.extravar.T{j},2);
+    % end
+    % sos.solinfo.x = nan(nx,1);
+    % sos.solinfo.RRx = nan(nx,1);
+    % sos.solinfo.y = nan(ny,1);
+    % sos.solinfo.RRy = nan(nx,1);
     return
 end
 
@@ -375,9 +392,9 @@ elseif strcmp(lower(options.solver),'sdpt3')
     if ~(isempty(K.s) || K.s(1)==0)   % DJ, 03/09/2022  (do we need the K.s(1)~=0 check?)
         idxX = 1;
         idx = K.f+1;
-        smblkdim = 100;
-        deblkidx = find(K.s > smblkdim);
-        spblkidx = find(K.s <= smblkdim);
+        % smblkdim = 100;   % DJ, 10/31/2024  (is there a reason we had smblkdim~=smallblkdim?)
+        deblkidx = find(K.s > smallblkdim);
+        spblkidx = find(K.s <= smallblkdim);
         blknnz = [0 cumsum(K.s.*K.s)];
         for i = deblkidx
             dummy = X{cellidx};
